@@ -1,8 +1,12 @@
-import numpy as np
+import logging
+import sys
+import argparse
 
-msg = "Roll a dice!"
-print(msg)
-
-print(np.random.randint(1,9))
+import solver
 
 
+def test_func(x: int) -> int:
+    return x
+
+# Intentionally passing a string instead of an int
+test_func("Hello World")
