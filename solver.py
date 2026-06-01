@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
-"""Sudoku solver using backtracking algorithm."""
+"""Sudoku solver using backtracking search."""
 
 import logging
 import sys
+import time
 import argparse
 
 # Configure logging
@@ -20,18 +21,59 @@ class Solver:
         self.input_file = input_file
         self.output_file = output_file
 
-    def backtracking(self):
+    def backtracking_search(self) -> None:
         try:
             with open(self.input_file, "r", encoding="utf-8") as file:
-                content = file.read()
-                print("File Content:")
-                print(content)
+                lines = file.readlines()
         except FileNotFoundError:
-            logger.error(f"'{self.input_file}' not found.", exc_info=True)
+            logger.error(f"'{self.input_file}' not found.")
             sys.exit(1)
         except PermissionError:
-            logger.error(f"Permission denied for '{self.input_file}'.", exc_info=True)
+            logger.error(f"Permission denied for '{self.input_file}'.")
             sys.exit(1)
+        assignment = [[num for num in line.split() if num != '|'] for line in lines if line[0] != '-']
+        
+        def bt(assignment: list[list[str]]) -> list[list[str]] | None:
+            # complete = True
+            # for row in assignment:
+            #     if '.' in row:
+            #         complete = False
+            # if complete:
+            #     return assignment
+
+            # found = False
+            # for row in assignment:
+            #     for num in row:
+            #         if num == '.':
+            #             pass
+            return assignment #TODO
+
+        start_time = time.perf_counter()
+        assignment = bt(assignment)
+        end_time = time.perf_counter()
+
+        self.time = end_time - start_time
+
+        if assignment is None:
+            self.found = False
+            return
+        else:
+            self.found = True
+
+        lines = ""
+        for i, row in enumerate(assignment):
+            for j, num in enumerate(row):
+                lines += num
+                if i in [2, 5] and j == 8:
+                    lines += "\n------+-------+------\n"
+                elif j == 8:
+                    lines += "\n"
+                elif j in [2, 5]:
+                    lines += " | "
+                else:
+                    lines += " "
+        with open(self.output_file, "w", encoding="utf-8") as file:
+            file.writelines(lines)
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -44,7 +86,6 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def main() -> None:
-    """Execute core program logic."""
     args = parse_arguments()
 
     if args.verbose:
@@ -54,7 +95,16 @@ def main() -> None:
     logger.info("Application started successfully.")
 
     solver = Solver(args.input_file, args.output_file)
-    solver.backtracking()
+    solver.backtracking_search()
+
+    if solver.found:
+        with open(solver.output_file, "r", encoding="utf-8") as file:
+            content = file.read()
+        logger.info(f"Solution written to {solver.output_file}:\n{content}")
+    else:
+        logger.info("Puzzle is over-constrained. No solution found.")
+
+    logger.info(f"Execution time: {solver.time:.6f} seconds")
 
 
 if __name__ == "__main__":
