@@ -31,49 +31,65 @@ class Solver:
         except PermissionError:
             logger.error(f"Permission denied for '{self.input_file}'.")
             sys.exit(1)
-        assignment = [[num for num in line.split() if num != '|'] for line in lines if line[0] != '-']
-        
-        def bt(assignment: list[list[str]]) -> list[list[str]] | None:
-            # complete = True
-            # for row in assignment:
-            #     if '.' in row:
-            #         complete = False
-            # if complete:
-            #     return assignment
+        assignment = [[num for num in line.split() if num != "|"] for line in lines if line[0] != "-"]
 
-            # found = False
-            # for row in assignment:
-            #     for num in row:
-            #         if num == '.':
-            #             pass
-            return assignment #TODO
+        def bts(assignment: list[list[str]]) -> list[list[str]] | None:
+            complete = True
+            for row in assignment:
+                if "." in row:
+                    complete = False
+            if complete:
+                return assignment
+
+            var = 0
+            while assignment[var // 9][var % 9] != ".":
+                var += 1
+
+            for val in range(1, 10):
+                assignment[var // 9][var % 9] = str(val)
+                sat = True
+                for i in range(9):
+                    if assignment[i][var % 9] == str(val) and i != var // 9:
+                        sat = False
+                    if assignment[var // 9][i] == str(val) and i != var % 9:
+                        sat = False
+                    row = var // 9 // 3 * 3 + i // 3
+                    col = var % 9 // 3 * 3 + i % 3
+                    if assignment[row][col] == str(val) and (row != var // 9 or col != var % 9):
+                        sat = False
+                if sat:
+                    result = bts(assignment)
+                    if result is not None:
+                        return result
+
+            assignment[var // 9][var % 9] = "."
 
         start_time = time.perf_counter()
-        assignment = bt(assignment)
+        result = bts(assignment)
         end_time = time.perf_counter()
 
         self.time = end_time - start_time
 
-        if assignment is None:
+        if result is None:
             self.found = False
             return
         else:
             self.found = True
 
-        lines = ""
-        for i, row in enumerate(assignment):
+        content = ""
+        for i, row in enumerate(result):
             for j, num in enumerate(row):
-                lines += num
+                content += num
                 if i in [2, 5] and j == 8:
-                    lines += "\n------+-------+------\n"
+                    content += "\n------+-------+------\n"
                 elif j == 8:
-                    lines += "\n"
+                    content += "\n"
                 elif j in [2, 5]:
-                    lines += " | "
+                    content += " | "
                 else:
-                    lines += " "
+                    content += " "
         with open(self.output_file, "w", encoding="utf-8") as file:
-            file.writelines(lines)
+            file.write(content)
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -102,7 +118,7 @@ def main() -> None:
             content = file.read()
         logger.info(f"Solution written to {solver.output_file}:\n{content}")
     else:
-        logger.info("Puzzle is over-constrained. No solution found.")
+        logger.info("No solution found. Over-constrained puzzle.")
 
     logger.info(f"Execution time: {solver.time:.6f} seconds")
 
