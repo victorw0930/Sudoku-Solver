@@ -31,41 +31,47 @@ class Solver:
         except PermissionError:
             logger.error(f"Permission denied for '{self.input_file}'.")
             sys.exit(1)
-        assignment = [[num for num in line.split() if num != "|"] for line in lines if line[0] != "-"]
+        assignment = [[val for val in line.split() if val != "|"] for line in lines if line[0] != "-"]
 
-        def bts(assignment: list[list[str]]) -> list[list[str]] | None:
-            complete = True
-            for row in assignment:
-                if "." in row:
-                    complete = False
-            if complete:
+        vars = []
+        for i, row in enumerate(assignment):
+            for j, val in enumerate(row):
+                if val == ".":
+                    vars.append((i, j))
+
+        vars_idx = 0
+
+        constraints = [[[False for k in range(9)] for j in range(9)] for i in range(3)]
+        for i, row in enumerate(assignment):
+            for j, val in enumerate(row):
+                if val != ".":
+                    constraints[0][i][int(val) - 1] = True
+                    constraints[1][j][int(val) - 1] = True
+                    constraints[2][i // 3 * 3 + j // 3][int(val) - 1] = True
+
+        def bts(assignment: list[list[str]], vars: list[tuple[int, int]], vars_idx: int,
+                constraints: list[list[list[bool]]]) -> list[list[str]] | None:
+            if vars_idx == len(vars):
                 return assignment
 
-            var = 0
-            while assignment[var // 9][var % 9] != ".":
-                var += 1
+            row = vars[vars_idx][0]
+            col = vars[vars_idx][1]
 
-            for val in range(1, 10):
-                assignment[var // 9][var % 9] = str(val)
-                sat = True
-                for i in range(9):
-                    if assignment[i][var % 9] == str(val) and i != var // 9:
-                        sat = False
-                    if assignment[var // 9][i] == str(val) and i != var % 9:
-                        sat = False
-                    row = var // 9 // 3 * 3 + i // 3
-                    col = var % 9 // 3 * 3 + i % 3
-                    if assignment[row][col] == str(val) and (row != var // 9 or col != var % 9):
-                        sat = False
-                if sat:
-                    result = bts(assignment)
+            for val in range(9):
+                if not (constraints[0][row][val] or constraints[1][col][val] or constraints[2][row // 3 * 3 + col // 3][val]):
+                    assignment[row][col] = str(val + 1)
+                    constraints[0][row][val] = True
+                    constraints[1][col][val] = True
+                    constraints[2][row // 3 * 3 + col // 3][val] = True
+                    result = bts(assignment, vars, vars_idx + 1, constraints)
                     if result is not None:
                         return result
-
-            assignment[var // 9][var % 9] = "."
+                    constraints[0][row][val] = False
+                    constraints[1][col][val] = False
+                    constraints[2][row // 3 * 3 + col // 3][val] = False
 
         start_time = time.perf_counter()
-        result = bts(assignment)
+        result = bts(assignment, vars, vars_idx, constraints)
         end_time = time.perf_counter()
 
         self.time = end_time - start_time
@@ -78,8 +84,8 @@ class Solver:
 
         content = ""
         for i, row in enumerate(result):
-            for j, num in enumerate(row):
-                content += num
+            for j, val in enumerate(row):
+                content += val
                 if i in [2, 5] and j == 8:
                     content += "\n------+-------+------\n"
                 elif j == 8:
