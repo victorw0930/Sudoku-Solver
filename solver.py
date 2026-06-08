@@ -41,16 +41,26 @@ class Solver:
 
         vars_idx = 0
 
-        constraints = [[[False for k in range(9)] for j in range(9)] for i in range(3)]
+        constraints = [[0 for j in range(9)] for i in range(3)]
         for i, row in enumerate(assignment):
             for j, val in enumerate(row):
                 if val != ".":
-                    constraints[0][i][int(val) - 1] = True
-                    constraints[1][j][int(val) - 1] = True
-                    constraints[2][i // 3 * 3 + j // 3][int(val) - 1] = True
+                    constraints[0][i] |= 1 << int(val) - 1
+                    constraints[1][j] |= 1 << int(val) - 1
+                    constraints[2][i // 3 * 3 + j // 3] |= 1 << int(val) - 1
 
-        def bts(assignment: list[list[str]], vars: list[tuple[int, int]], vars_idx: int,
-                constraints: list[list[list[bool]]]) -> list[list[str]] | None:
+        domains = [[0 for j in range(9)] for i in range(9)]
+        for i, row in enumerate(assignment):
+            for j, val in enumerate(row):
+                if val == ".":
+                    domains[i][j] = constraints[0][i] | constraints[1][j] | constraints[2][i // 3 * 3 + j // 3]
+                else:
+                    domains[i][j] = (1 << 9) - 1
+
+        def bts(assignment: list[list[str]],
+                vars: list[tuple[int, int]],
+                vars_idx: int,
+                constraints: list[list[int]]) -> list[list[str]] | None:
             if vars_idx == len(vars):
                 return assignment
 
@@ -58,17 +68,19 @@ class Solver:
             col = vars[vars_idx][1]
 
             for val in range(9):
-                if not (constraints[0][row][val] or constraints[1][col][val] or constraints[2][row // 3 * 3 + col // 3][val]):
+                if not (constraints[0][row] >> val & 1 or
+                        constraints[1][col] >> val & 1 or
+                        constraints[2][row // 3 * 3 + col // 3] >> val & 1):
                     assignment[row][col] = str(val + 1)
-                    constraints[0][row][val] = True
-                    constraints[1][col][val] = True
-                    constraints[2][row // 3 * 3 + col // 3][val] = True
+                    constraints[0][row] |= 1 << val
+                    constraints[1][col] |= 1 << val
+                    constraints[2][row // 3 * 3 + col // 3] |= 1 << val
                     result = bts(assignment, vars, vars_idx + 1, constraints)
                     if result is not None:
                         return result
-                    constraints[0][row][val] = False
-                    constraints[1][col][val] = False
-                    constraints[2][row // 3 * 3 + col // 3][val] = False
+                    constraints[0][row] &= ~(1 << val)
+                    constraints[1][col] &= ~(1 << val)
+                    constraints[2][row // 3 * 3 + col // 3] &= ~(1 << val)
 
         start_time = time.perf_counter()
         result = bts(assignment, vars, vars_idx, constraints)
