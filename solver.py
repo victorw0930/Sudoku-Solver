@@ -41,7 +41,7 @@ class Solver:
 
         vars_idx = 0
 
-        constraints = [[0 for j in range(9)] for i in range(3)]
+        constraints = [[0 for _ in range(9)] for _ in range(3)]
         for i, row in enumerate(assignment):
             for j, val in enumerate(row):
                 if val != ".":
@@ -49,41 +49,67 @@ class Solver:
                     constraints[1][j] |= 1 << int(val) - 1
                     constraints[2][i // 3 * 3 + j // 3] |= 1 << int(val) - 1
 
-        domains = [[0 for j in range(9)] for i in range(9)]
+        domains = [[0 for _ in range(9)] for _ in range(9)]
         for i, row in enumerate(assignment):
             for j, val in enumerate(row):
-                if val == ".":
-                    domains[i][j] = constraints[0][i] | constraints[1][j] | constraints[2][i // 3 * 3 + j // 3]
-                else:
-                    domains[i][j] = (1 << 9) - 1
+                domains[i][j] = constraints[0][i] | constraints[1][j] | constraints[2][i // 3 * 3 + j // 3]
 
         def bts(assignment: list[list[str]],
                 vars: list[tuple[int, int]],
                 vars_idx: int,
-                constraints: list[list[int]]) -> list[list[str]] | None:
+                domains: list[list[int]]) -> list[list[str]] | None:
             if vars_idx == len(vars):
                 return assignment
 
             row = vars[vars_idx][0]
             col = vars[vars_idx][1]
 
-            for val in range(9):
-                if not (constraints[0][row] >> val & 1 or
-                        constraints[1][col] >> val & 1 or
-                        constraints[2][row // 3 * 3 + col // 3] >> val & 1):
-                    assignment[row][col] = str(val + 1)
-                    constraints[0][row] |= 1 << val
-                    constraints[1][col] |= 1 << val
-                    constraints[2][row // 3 * 3 + col // 3] |= 1 << val
-                    result = bts(assignment, vars, vars_idx + 1, constraints)
+            for val in [val for val in range(9) if not domains[row][col] >> val & 1]:
+                assignment[row][col] = str(val + 1)
+                assigned = []
+                sat = True
+
+                for n in range(9):
+                    if not sat:
+                        break
+                    if assignment[n][col] == "." and not domains[n][col] >> val & 1:
+                        domains[n][col] |= 1 << val
+                        assigned.append((n, col))
+                        if domains[n][col] == (1 << 9) - 1:
+                            sat = False
+
+                for n in range(9):
+                    if not sat:
+                        break
+                    if assignment[row][n] == "." and not domains[row][n] >> val & 1:
+                        domains[row][n] |= 1 << val
+                        assigned.append((row, n))
+                        if domains[row][n] == (1 << 9) - 1:
+                            sat = False
+
+                for n in range(9):
+                    if not sat:
+                        break
+                    r = row // 3 * 3 + n // 3
+                    c = col // 3 * 3 + n % 3
+                    if assignment[r][c] == "." and not domains[r][c] >> val & 1:
+                        domains[r][c] |= 1 << val
+                        assigned.append((r, c))
+                        if domains[r][c] == (1 << 9) - 1:
+                            sat = False
+
+                if sat:
+                    result = bts(assignment, vars, vars_idx + 1, domains)
                     if result is not None:
                         return result
-                    constraints[0][row] &= ~(1 << val)
-                    constraints[1][col] &= ~(1 << val)
-                    constraints[2][row // 3 * 3 + col // 3] &= ~(1 << val)
+
+                for r, c in assigned:
+                    domains[r][c] &= ~(1 << val)
+
+            assignment[row][col] = "."
 
         start_time = time.perf_counter()
-        result = bts(assignment, vars, vars_idx, constraints)
+        result = bts(assignment, vars, vars_idx, domains)
         end_time = time.perf_counter()
 
         self.time = end_time - start_time
