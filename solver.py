@@ -54,6 +54,41 @@ class Solver:
             for j, val in enumerate(row):
                 domains[i][j] = constraints[0][i] | constraints[1][j] | constraints[2][i // 3 * 3 + j // 3]
 
+        def add_arcs(arcs: set[tuple[tuple[int, int], int]],
+                     assignment: list[list[str]],
+                     domains: list[list[int]],
+                     var: tuple[int, int],
+                     val: int) -> None:
+            row, col = var
+            for n in range(9):
+                if assignment[n][col] == "." and n != row and not domains[n][col] >> val & 1:
+                    arcs.add(((n, col), val))
+            for n in range(9):
+                if assignment[row][n] == "." and n != col and not domains[row][n] >> val & 1:
+                    arcs.add(((row, n), val))
+            for n in range(9):
+                r = row // 3 * 3 + n // 3
+                c = col // 3 * 3 + n % 3
+                if assignment[r][c] == "." and (r != row or c != col) and not domains[r][c] >> val & 1:
+                    arcs.add(((r, c), val))
+
+        arcs = set()
+        for i, row in enumerate(domains):
+            for j, domain in enumerate(row):
+                inverted = domain ^ (1 << 9) - 1
+                if not inverted & (inverted - 1) and assignment[i][j] == ".":
+                    val = inverted.bit_length() - 1
+                    add_arcs(arcs, assignment, domains, (i, j), val)
+
+        while arcs:
+            (row, col), val = arcs.pop()
+            domains[row][col] |= 1 << val
+
+            inverted = domains[row][col] ^ (1 << 9) - 1
+            if not inverted & (inverted - 1):
+                val = inverted.bit_length() - 1
+                add_arcs(arcs, assignment, domains, (row, col), val)
+
         def bts(assignment: list[list[str]],
                 vars: list[tuple[int, int]],
                 vars_idx: int,
@@ -61,49 +96,36 @@ class Solver:
             if vars_idx == len(vars):
                 return assignment
 
-            row = vars[vars_idx][0]
-            col = vars[vars_idx][1]
+            row, col = vars[vars_idx]
 
             for val in [val for val in range(9) if not domains[row][col] >> val & 1]:
                 assignment[row][col] = str(val + 1)
                 assigned = []
                 sat = True
 
-                for n in range(9):
-                    if not sat:
-                        break
-                    if assignment[n][col] == "." and not domains[n][col] >> val & 1:
-                        domains[n][col] |= 1 << val
-                        assigned.append((n, col))
-                        if domains[n][col] == (1 << 9) - 1:
-                            sat = False
+                arcs = set()
+                add_arcs(arcs, assignment, domains, (row, col), val)
 
-                for n in range(9):
-                    if not sat:
-                        break
-                    if assignment[row][n] == "." and not domains[row][n] >> val & 1:
-                        domains[row][n] |= 1 << val
-                        assigned.append((row, n))
-                        if domains[row][n] == (1 << 9) - 1:
-                            sat = False
+                while arcs:
+                    (r, c), val = arcs.pop()
+                    domains[r][c] |= 1 << val
+                    assigned.append(((r, c), val))    
 
-                for n in range(9):
-                    if not sat:
+                    if domains[r][c] == (1 << 9) - 1:
+                        sat = False
                         break
-                    r = row // 3 * 3 + n // 3
-                    c = col // 3 * 3 + n % 3
-                    if assignment[r][c] == "." and not domains[r][c] >> val & 1:
-                        domains[r][c] |= 1 << val
-                        assigned.append((r, c))
-                        if domains[r][c] == (1 << 9) - 1:
-                            sat = False
+
+                    inverted = domains[r][c] ^ (1 << 9) - 1
+                    if not inverted & (inverted - 1):
+                        val = inverted.bit_length() - 1
+                        add_arcs(arcs, assignment, domains, (r, c), val)
 
                 if sat:
                     result = bts(assignment, vars, vars_idx + 1, domains)
                     if result is not None:
                         return result
 
-                for r, c in assigned:
+                for (r, c), val in assigned:
                     domains[r][c] &= ~(1 << val)
 
             assignment[row][col] = "."
@@ -117,8 +139,7 @@ class Solver:
         if result is None:
             self.found = False
             return
-        else:
-            self.found = True
+        self.found = True
 
         content = ""
         for i, row in enumerate(result):
