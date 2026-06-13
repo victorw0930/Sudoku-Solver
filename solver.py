@@ -21,7 +21,7 @@ class Solver:
         self.input_file = input_file
         self.output_file = output_file
 
-    def backtracking_search(self) -> None:
+    def backtracking_search(self) -> bool:
         try:
             with open(self.input_file, "r", encoding="utf-8") as file:
                 lines = file.readlines()
@@ -130,31 +130,26 @@ class Solver:
 
             assignment[row][col] = "."
 
-        start_time = time.perf_counter()
         result = bts(assignment, vars, vars_idx, domains)
-        end_time = time.perf_counter()
 
-        self.time = end_time - start_time
+        if result is not None:
+            content = ""
+            for i, row in enumerate(result):
+                for j, val in enumerate(row):
+                    content += val
+                    if i in [2, 5] and j == 8:
+                        content += "\n------+-------+------\n"
+                    elif j == 8:
+                        content += "\n"
+                    elif j in [2, 5]:
+                        content += " | "
+                    else:
+                        content += " "
+            with open(self.output_file, "w", encoding="utf-8") as file:
+                file.write(content)
 
-        if result is None:
-            self.found = False
-            return
-        self.found = True
-
-        content = ""
-        for i, row in enumerate(result):
-            for j, val in enumerate(row):
-                content += val
-                if i in [2, 5] and j == 8:
-                    content += "\n------+-------+------\n"
-                elif j == 8:
-                    content += "\n"
-                elif j in [2, 5]:
-                    content += " | "
-                else:
-                    content += " "
-        with open(self.output_file, "w", encoding="utf-8") as file:
-            file.write(content)
+            return True
+        return False
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -176,16 +171,19 @@ def main() -> None:
     logger.info("Application started successfully.")
 
     solver = Solver(args.input_file, args.output_file)
-    solver.backtracking_search()
+    start_time = time.perf_counter()
+    found = solver.backtracking_search()
+    end_time = time.perf_counter()
+    execution_time = end_time - start_time
 
-    if solver.found:
+    if found:
         with open(solver.output_file, "r", encoding="utf-8") as file:
             content = file.read()
         logger.info(f"Solution written to {solver.output_file}:\n{content}")
     else:
         logger.info("No solution found. Over-constrained puzzle.")
 
-    logger.info(f"Execution time: {solver.time:.6f} seconds")
+    logger.info(f"Execution time: {execution_time:.6f} seconds")
 
 
 if __name__ == "__main__":
